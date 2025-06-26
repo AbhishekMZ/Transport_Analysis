@@ -1,0 +1,182 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 210 40% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 210 40% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 40% 8%;
+    --primary: 210 100% 12%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 210 40% 8%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 24 95% 53%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 210 100% 12%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 210 100% 6%;
+    --foreground: 0 0% 98%;
+    --card: 210 100% 8%;
+    --card-foreground: 0 0% 98%;
+    --popover: 210 100% 8%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 210 100% 6%;
+    --secondary: 210 100% 12%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 210 100% 12%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 24 95% 53%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 210 100% 12%;
+    --input: 210 100% 12%;
+    --ring: 0 0% 98%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-bold;
+  }
+}
+
+/* Custom styles for TransiGenius */
+.transigenius-gradient {
+  background: linear-gradient(135deg, #102a43 0%, #243b53 50%, #334e68 100%);
+}
+
+.transigenius-card {
+  @apply bg-white/95 backdrop-blur-sm border border-navy-200 shadow-lg;
+}
+
+.dark .transigenius-card {
+  @apply bg-navy-900/95 border-navy-700;
+}
+
+.transigenius-button {
+  @apply bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold transition-all duration-200 transform hover:scale-105;
+}
+
+.transigenius-button-secondary {
+  @apply bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white font-semibold transition-all duration-200 transform hover:scale-105;
+}
+
+/* Leaflet map styles */
+.leaflet-container {
+  @apply rounded-lg overflow-hidden;
+}
+
+.leaflet-popup-content-wrapper {
+  @apply bg-white/95 backdrop-blur-sm rounded-lg shadow-xl;
+}
+
+.dark .leaflet-popup-content-wrapper {
+  @apply bg-navy-900/95;
+}
+
+/* Custom scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  @apply bg-navy-100;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-navy-400 rounded-full;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  @apply bg-navy-500;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-track {
+  @apply bg-navy-800;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-navy-600;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  @apply bg-navy-500;
+}
+
+/* Animation classes */
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s ease-out;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.5s ease-out;
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Chart container styles */
+.recharts-wrapper {
+  @apply rounded-lg;
+}
+
+.recharts-cartesian-grid line {
+  @apply stroke-navy-200;
+}
+
+.dark .recharts-cartesian-grid line {
+  @apply stroke-navy-700;
+}
+
+.recharts-text {
+  @apply fill-navy-600 text-sm;
+}
+
+.dark .recharts-text {
+  @apply fill-navy-300;
+}

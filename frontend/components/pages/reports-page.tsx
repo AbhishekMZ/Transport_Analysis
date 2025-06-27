@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -11,72 +11,30 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { FileText, Download, Eye, Plus, Search, Calendar, Filter } from "lucide-react"
 import DashboardLayout from "@/components/dashboard-layout"
-
-interface Report {
-  id: string
-  title: string
-  description: string
-  type: string
-  createdDate: string
-  thumbnail: string
-  tags: string[]
-  size: string
-}
+import { ReportsAPI, Report, ReportType, ReportTemplate } from "@/lib/api"
 
 export default function ReportsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedType, setSelectedType] = useState("all")
   const [isGenerating, setIsGenerating] = useState(false)
+  const [reports, setReports] = useState<Report[]>([])
+  const [reportTypes, setReportTypes] = useState<ReportType[]>([])
+  const [reportTemplates, setReportTemplates] = useState<ReportTemplate[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [reportParams, setReportParams] = useState({
-    type: "map-based",
+    type: "traffic",
     title: "",
     description: "",
-    dataSource: "historical",
-    dateRange: "last-week",
-    format: "pdf",
+    data_source: "historical",
+    date_range: "last-week",
+    format: "json",
     template: "standard",
+    area: "",
+    include_traffic: true,
+    include_network: true,
+    include_forecast: false,
   })
-
-  const mockReports: Report[] = [
-    {
-      id: "RPT_001",
-      title: "Weekly Traffic Analysis",
-      description: "Comprehensive traffic flow analysis for the past week",
-      type: "Traffic Analysis",
-      createdDate: "2024-01-15",
-      thumbnail: "/placeholder.svg?height=120&width=200",
-      tags: ["traffic", "weekly", "analysis"],
-      size: "2.4 MB",
-    },
-    {
-      id: "RPT_002",
-      title: "Critical Nodes Report",
-      description: "Network criticality analysis using betweenness centrality",
-      type: "Network Analysis",
-      createdDate: "2024-01-14",
-      thumbnail: "/placeholder.svg?height=120&width=200",
-      tags: ["network", "criticality", "nodes"],
-      size: "1.8 MB",
-    },
-    {
-      id: "RPT_003",
-      title: "ML Forecast Summary",
-      description: "Traffic flow predictions for next month",
-      type: "Forecast",
-      createdDate: "2024-01-13",
-      thumbnail: "/placeholder.svg?height=120&width=200",
-      tags: ["forecast", "ml", "prediction"],
-      size: "3.1 MB",
-    },
-  ]
-
-  const reportTypes = [
-    { value: "all", label: "All Types" },
-    { value: "traffic", label: "Traffic Analysis" },
-    { value: "network", label: "Network Analysis" },
-    { value: "forecast", label: "Forecast" },
-    { value: "static-map", label: "Static Map" },
-  ]
 
   const dataSourceOptions = [
     { value: "historical", label: "Historical Data" },
@@ -85,33 +43,92 @@ export default function ReportsPage() {
     { value: "forecast", label: "Forecast Results" },
   ]
 
-  const templateOptions = [
-    { value: "standard", label: "Standard Report" },
-    { value: "executive", label: "Executive Summary" },
-    { value: "technical", label: "Technical Details" },
-    { value: "comparison", label: "Comparative Analysis" },
-  ]
-
   const formatOptions = [
+    { value: "json", label: "JSON Data" },
     { value: "pdf", label: "PDF Document" },
     { value: "png", label: "PNG Image" },
     { value: "html", label: "Interactive HTML" },
   ]
 
-  const generateReport = async () => {
-    setIsGenerating(true)
+  const dateRangeOptions = [
+    { value: "last-hour", label: "Last Hour" },
+    { value: "last-day", label: "Last 24 Hours" },
+    { value: "last-week", label: "Last Week" },
+    { value: "last-month", label: "Last Month" },
+    { value: "custom", label: "Custom Range" },
+  ]
+
+  // Load initial data
+  useEffect(() => {
+    loadReports()
+    loadReportTypes()
+    loadReportTemplates()
+  }, [])
+
+  const loadReports = async () => {
     try {
-      // Simulate report generation
-      await new Promise((resolve) => setTimeout(resolve, 3000))
-      console.log("Report generated with params:", reportParams)
-    } catch (error) {
-      console.error("Report generation failed:", error)
+      setLoading(true)
+      const reportsData = await ReportsAPI.getReports()
+      setReports(reportsData)
+      setError(null)
+    } catch (err) {
+      console.error("Failed to load reports:", err)
+      setError("Failed to load reports")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadReportTypes = async () => {
+    try {
+      const typesData = await ReportsAPI.getReportTypes()
+      setReportTypes(typesData)
+    } catch (err) {
+      console.error("Failed to load report types:", err)
+    }
+  }
+
+  const loadReportTemplates = async () => {
+    try {
+      const templatesData = await ReportsAPI.getReportTemplates()
+      setReportTemplates(templatesData)
+    } catch (err) {
+      console.error("Failed to load report templates:", err)
+    }
+  }
+
+  const generateReport = async () => {
+    if (!reportParams.title.trim()) {
+      setError("Please enter a report title")
+      return
+    }
+
+    setIsGenerating(true)
+    setError(null)
+    
+    try {
+      const response = await ReportsAPI.generateReport(reportParams)
+      console.log("Report generated:", response)
+      
+      // Reload reports list
+      await loadReports()
+      
+      // Reset form
+      setReportParams({
+        ...reportParams,
+        title: "",
+        description: ""
+      })
+      
+    } catch (err) {
+      console.error("Report generation failed:", err)
+      setError(`Failed to generate report: ${err instanceof Error ? err.message : 'Unknown error'}`)
     } finally {
       setIsGenerating(false)
     }
   }
 
-  const filteredReports = mockReports.filter((report) => {
+  const filteredReports = reports.filter((report) => {
     const matchesSearch =
       report.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       report.description.toLowerCase().includes(searchQuery.toLowerCase())
@@ -157,9 +174,11 @@ export default function ReportsPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="map-based">Map-based Report</SelectItem>
-                      <SelectItem value="statistical">Statistical Report</SelectItem>
-                      <SelectItem value="combined">Combined Report</SelectItem>
+                      {reportTypes.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -186,8 +205,8 @@ export default function ReportsPage() {
                 <div>
                   <Label>Data Source</Label>
                   <Select
-                    value={reportParams.dataSource}
-                    onValueChange={(value) => setReportParams((prev) => ({ ...prev, dataSource: value }))}
+                    value={reportParams.data_source}
+                    onValueChange={(value) => setReportParams((prev) => ({ ...prev, data_source: value }))}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -203,16 +222,16 @@ export default function ReportsPage() {
                 </div>
 
                 <div>
-                  <Label>Template</Label>
+                  <Label>Date Range</Label>
                   <Select
-                    value={reportParams.template}
-                    onValueChange={(value) => setReportParams((prev) => ({ ...prev, template: value }))}
+                    value={reportParams.date_range}
+                    onValueChange={(value) => setReportParams((prev) => ({ ...prev, date_range: value }))}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {templateOptions.map((option) => (
+                      {dateRangeOptions.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label}
                         </SelectItem>
@@ -234,6 +253,25 @@ export default function ReportsPage() {
                       {formatOptions.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label>Template</Label>
+                  <Select
+                    value={reportParams.template}
+                    onValueChange={(value) => setReportParams((prev) => ({ ...prev, template: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {reportTemplates.map((template) => (
+                        <SelectItem key={template.value} value={template.value}>
+                          {template.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -302,6 +340,7 @@ export default function ReportsPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
                       {reportTypes.map((type) => (
                         <SelectItem key={type.value} value={type.value}>
                           {type.label}
@@ -317,45 +356,60 @@ export default function ReportsPage() {
 
                 {/* Reports Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredReports.map((report) => (
-                    <Card key={report.id} className="hover:shadow-lg transition-shadow">
-                      <div className="aspect-video bg-gray-100 rounded-t-lg overflow-hidden">
-                        <img
-                          src={report.thumbnail || "/placeholder.svg"}
-                          alt={report.title}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between mb-2">
-                          <h3 className="font-semibold text-lg truncate">{report.title}</h3>
-                          <Badge variant="outline">{report.type}</Badge>
+                  {loading ? (
+                    <div className="col-span-full text-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                      <p className="mt-2 text-gray-600">Loading reports...</p>
+                    </div>
+                  ) : error ? (
+                    <div className="col-span-full text-center py-8">
+                      <p className="text-red-600">{error}</p>
+                      <Button onClick={loadReports} className="mt-2">
+                        Retry
+                      </Button>
+                    </div>
+                  ) : filteredReports.length === 0 ? (
+                    <div className="col-span-full text-center py-8">
+                      <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-600">No reports found</p>
+                    </div>
+                  ) : (
+                    filteredReports.map((report) => (
+                      <Card key={report.id} className="hover:shadow-lg transition-shadow">
+                        <div className="aspect-video bg-gray-100 rounded-t-lg overflow-hidden flex items-center justify-center">
+                          <FileText className="h-12 w-12 text-gray-400" />
                         </div>
-                        <p className="text-sm text-gray-600 mb-3 line-clamp-2">{report.description}</p>
-                        <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
-                          <span>{new Date(report.createdDate).toLocaleDateString()}</span>
-                          <span>{report.size}</span>
-                        </div>
-                        <div className="flex flex-wrap gap-1 mb-3">
-                          {report.tags.map((tag) => (
-                            <Badge key={tag} variant="secondary" className="text-xs">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                        <div className="flex space-x-2">
-                          <Button size="sm" variant="outline" className="flex-1">
-                            <Eye className="h-4 w-4 mr-1" />
-                            View
-                          </Button>
-                          <Button size="sm" variant="outline" className="flex-1">
-                            <Download className="h-4 w-4 mr-1" />
-                            Download
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <h3 className="font-semibold text-lg truncate">{report.title}</h3>
+                            <Badge variant="outline">{report.type}</Badge>
+                          </div>
+                          <p className="text-sm text-gray-600 mb-3 line-clamp-2">{report.description}</p>
+                          <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
+                            <span>{new Date(report.created_date).toLocaleDateString()}</span>
+                            <span>{report.size}</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1 mb-3">
+                            {report.tags.map((tag) => (
+                              <Badge key={tag} variant="secondary" className="text-xs">
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
+                          <div className="flex space-x-2">
+                            <Button variant="outline" size="sm" className="flex-1">
+                              <Eye className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                            <Button variant="outline" size="sm" className="flex-1">
+                              <Download className="h-4 w-4 mr-1" />
+                              Download
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
                 </div>
 
                 {filteredReports.length === 0 && (

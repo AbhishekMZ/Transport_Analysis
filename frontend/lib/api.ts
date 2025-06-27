@@ -3,11 +3,8 @@
  * Provides functions for interacting with all backend API endpoints
  */
 
-// Base API URL from environment variable or default to localhost:8000
-// Using typeof to ensure this works correctly in both server and client contexts
-const API_BASE_URL = typeof window !== 'undefined' 
-  ? (window as any).__env?.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1'
-  : process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1';
+// Base API URL – works both client and server side
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1';
 
 // Types
 export interface TrafficFlow {
@@ -98,6 +95,43 @@ export interface Forecast {
     name: string;
     importance: number;
   }[];
+}
+
+export interface Report {
+  id: string;
+  title: string;
+  description: string;
+  type: string;
+  created_date: string;
+  size: string;
+  tags: string[];
+  file_path?: string;
+}
+
+export interface ReportGenerationRequest {
+  title: string;
+  description: string;
+  type: string;
+  data_source: string;
+  date_range: string;
+  format: string;
+  template: string;
+  area?: string;
+  include_traffic: boolean;
+  include_network: boolean;
+  include_forecast: boolean;
+}
+
+export interface ReportType {
+  value: string;
+  label: string;
+  description: string;
+}
+
+export interface ReportTemplate {
+  value: string;
+  label: string;
+  description: string;
 }
 
 /**
@@ -239,5 +273,46 @@ export const AnalysisAPI = {
     const url = `${API_BASE_URL}/analysis/forecasting?${queryParams.toString()}`;
     const response = await fetch(url);
     return response.json() as Promise<Forecast>;
+  }
+};
+
+/**
+ * Reports API
+ */
+export const ReportsAPI = {
+  // Get report types
+  getReportTypes: async () => {
+    const response = await fetch(`${API_BASE_URL}/reports/types`);
+    return response.json() as Promise<ReportType[]>;
+  },
+
+  // Get report templates
+  getReportTemplates: async () => {
+    const response = await fetch(`${API_BASE_URL}/reports/templates`);
+    return response.json() as Promise<ReportTemplate[]>;
+  },
+
+  // Generate report
+  generateReport: async (params: ReportGenerationRequest) => {
+    const response = await fetch(`${API_BASE_URL}/reports/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(params)
+    });
+    return response.json() as Promise<Report>;
+  },
+
+  // Get report by ID
+  getReport: async (id: string) => {
+    const response = await fetch(`${API_BASE_URL}/reports/${id}`);
+    return response.json() as Promise<Report>;
+  },
+
+  // Get all reports
+  getReports: async () => {
+    const response = await fetch(`${API_BASE_URL}/reports`);
+    return response.json() as Promise<Report[]>;
   }
 };

@@ -1,0 +1,35 @@
+[2025-06-27 13:11:07,211] INFO - --- Starting Local Pickle Network Load for 2023 from 'C:\Users\Mishael Abhishek\Projects\Transport_Analysis\Public-Transport-Analysis\ProjectOSMNEW\graphs_snapshots\graph_2023.pkl' ---
+[2025-06-27 13:11:11,044] ERROR - Pickle file at C:\Users\Mishael Abhishek\Projects\Transport_Analysis\Public-Transport-Analysis\ProjectOSMNEW\graphs_snapshots\graph_2023.pkl does not contain a GeoDataFrame.
+[2025-06-27 13:14:31,425] ERROR - A critical error occurred: name '_True' is not defined
+Traceback (most recent call last):
+  File "C:\Users\Mishael Abhishek\Projects\Transport_Analysis\backend\load_data.py", line 244, in <module>
+    main()
+  File "C:\Users\Mishael Abhishek\Projects\Transport_Analysis\backend\load_data.py", line 216, in main
+    pickle_parser.add_argument('--file', required=_True, help='Filename or absolute path of the .pkl file.')
+                                                  ^^^^^
+NameError: name '_True' is not defined
+[2025-06-27 13:16:12,341] INFO - --- Starting Local Pickle Network Load for 2023 from 'C:\Users\Mishael Abhishek\Projects\Transport_Analysis\Public-Transport-Analysis\ProjectOSMNEW\graphs_snapshots\graph_2023.pkl' ---
+[2025-06-27 13:16:12,343] INFO - Pickle file contains a NetworkX graph. Converting to GeoDataFrame...
+[2025-06-27 13:16:12,343] ERROR - Failed to load Pickle network data: 'crs'
+Traceback (most recent call last):
+  File "C:\Users\Mishael Abhishek\Projects\Transport_Analysis\backend\load_data.py", line 146, in load_pickle_network
+    gdf = ox.graph_to_gdfs(data_obj, nodes=False, edges=True)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Mishael Abhishek\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\osmnx\convert.py", line 146, in graph_to_gdfs
+    crs = G.graph["crs"]
+          ~~~~~~~^^^^^^^
+KeyError: 'crs'
+[2025-06-27 13:18:50,254] INFO - --- Starting Local Pickle Network Load for 2023 from 'C:\Users\Mishael Abhishek\Projects\Transport_Analysis\Public-Transport-Analysis\ProjectOSMNEW\graphs_snapshots\graph_2023.pkl' ---
+[2025-06-27 13:18:50,255] INFO - Pickle file contains a NetworkX graph. Converting to GeoDataFrame...
+[2025-06-27 13:18:50,256] WARNING - Graph is missing CRS information. Assuming WGS84 (epsg:4326).
+[2025-06-27 13:18:50,257] ERROR - Failed to load Pickle network data: Graph contains no edges.
+Traceback (most recent call last):
+  File "C:\Users\Mishael Abhishek\Projects\Transport_Analysis\backend\load_data.py", line 151, in load_pickle_network
+    gdf = ox.graph_to_gdfs(data_obj, nodes=False, edges=True)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Mishael Abhishek\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\osmnx\convert.py", line 169, in graph_to_gdfs
+    raise ValueError(msg)
+ValueError: Graph contains no edges.
+[2025-06-27 13:21:59,716] INFO - --- Starting Local Pickle Network Load for 2023 from 'C:\Users\Mishael Abhishek\Projects\Transport_Analysis\Public-Transport-Analysis\ProjectOSMNEW\graphs_snapshots\graph_2023.pkl' ---
+[2025-06-27 13:21:59,717] INFO - Pickle file contains a NetworkX graph. Converting to GeoDataFrame...
+[2025-06-27 13:21:59,718] WARNING - Graph in graph_2023.pkl contains no edges. Skipping this file.

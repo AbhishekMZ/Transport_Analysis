@@ -2,10 +2,19 @@
 Network analysis API endpoints for the transport network.
 """
 
-from fastapi import APIRouter, HTTPException, Query, Path
+from fastapi import APIRouter, HTTPException, Query, Path, Depends
 from typing import Dict, Any, List, Optional
-import random
 from datetime import datetime
+from sqlalchemy.orm import Session
+
+from app.services.analysis_service import analysis_service
+from app.database import get_db
+from app.services.graph_service import graph_service
+from app.db.models import RoadSegment
+import networkx as nx
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -36,151 +45,103 @@ async def get_critical_nodes(
                 detail=f"Invalid transport mode: {mode}. Valid options: {', '.join(valid_modes)}"
             )
     
-    # This is placeholder implementation
-    # In a real implementation, this would:
-    # 1. Load the appropriate graph for the requested year
-    # 2. Apply the specified centrality algorithm
-    # 3. Return the top N critical nodes
-    
-    # Generate placeholder data for development/testing
-    bangalore_center = [77.5946, 12.9716]
-    node_types = ["intersection", "bus_terminal", "metro_station", "bridge", "highway_exit"]
-    
-    critical_nodes = []
-    for i in range(top_n):
-        # Create a slightly randomized location around Bangalore center
-        lon_offset = (random.random() - 0.5) * 0.1
-        lat_offset = (random.random() - 0.5) * 0.1
+    try:
+        # Use real analysis service
+        critical_nodes = await analysis_service.get_critical_nodes(
+            year=year,
+            algorithm=algorithm,
+            top_n=top_n,
+            transport_modes=transport_modes
+        )
         
-        # Create a node with randomized properties
-        node_type = random.choice(node_types)
-        centrality = round(random.uniform(0.6, 1.0), 2)
-        impact_score = round(random.uniform(0.5, 1.0), 2)
+        # Convert to API response format
+        nodes_data = []
+        for node in critical_nodes:
+            nodes_data.append({
+                "id": node.id,
+                "coordinates": node.coordinates,
+                "centrality_score": node.centrality_score,
+                "node_type": node.node_type,
+                "transport_modes": node.transport_modes,
+                "description": node.description
+            })
         
-        # Higher impact for higher centrality (with some randomness)
-        impact_score = min(1.0, centrality + random.uniform(-0.1, 0.2))
+        return {
+            "critical_nodes": nodes_data,
+            "algorithm": algorithm,
+            "year": year,
+            "transport_modes": transport_modes,
+            "total_found": len(nodes_data),
+            "analysis_timestamp": datetime.now().isoformat()
+        }
         
-        # Add transport modes relevant to this node
-        node_modes = []
-        if node_type in ["intersection", "bridge", "highway_exit"]:
-            node_modes.append("road")
-        if node_type in ["bus_terminal", "intersection"]:
-            node_modes.append("bus")
-        if node_type == "metro_station":
-            node_modes.append("metro")
-        
-        # Filter out nodes that don't match requested transport modes
-        if not any(mode in transport_modes for mode in node_modes):
-            continue
-        
-        critical_nodes.append({
-            "id": f"node_{i+1}",
-            "type": node_type,
-            "centrality": centrality,
-            "impact_score": impact_score,
-            "transport_modes": node_modes,
-            "location": {
-                "type": "Point",
-                "coordinates": [
-                    bangalore_center[0] + lon_offset,
-                    bangalore_center[1] + lat_offset
-                ]
-            },
-            "name": f"{node_type.replace('_', ' ').title()} {i+1}",
-            "affected_routes": random.randint(1, 15)
-        })
-    
-    # Sort by centrality (descending)
-    critical_nodes.sort(key=lambda x: x["centrality"], reverse=True)
-    
-    return {
-        "algorithm": algorithm,
-        "year": year,
-        "transport_modes": transport_modes,
-        "run_timestamp": datetime.now().isoformat(),
-        "critical_nodes": critical_nodes[:top_n]
-    }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to analyze critical nodes: {str(e)}"
+        )
 
-
-@router.post("/analysis/disruption-simulation")
+@router.post("/analysis/simulate-disruption")
 async def simulate_disruption(
     year: int = Query(2025, description="Year to simulate"),
     disruption_type: str = Query("node_failure", description="Type of disruption to simulate"),
     disruption_nodes: List[str] = Query(None, description="Specific nodes to disrupt"),
-    disruption_area: Optional[str] = Query(None, description="Area to disrupt (e.g., central, koramangala)")
+    disruption_area: Optional[str] = Query(None, description="Area to disrupt (e.g., central, koramangala)"),
+    transport_modes: List[str] = Query(["road", "bus", "metro"], description="Transport modes to include")
 ) -> Dict[str, Any]:
     """
     Simulate the effects of disruptions on the transport network.
     """
     # Validate disruption type
-    valid_disruption_types = ["node_failure", "link_failure", "area_congestion", "natural_disaster"]
-    if disruption_type not in valid_disruption_types:
+    valid_types = ["node_failure", "edge_failure", "area_disruption", "natural_disaster"]
+    if disruption_type not in valid_types:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid disruption type. Valid options: {', '.join(valid_disruption_types)}"
+            detail=f"Invalid disruption type. Valid options: {', '.join(valid_types)}"
         )
     
-    # For area disruptions, an area must be specified
-    if disruption_type == "area_congestion" and not disruption_area:
+    # Validate that either nodes or area is specified
+    if not disruption_nodes and not disruption_area:
         raise HTTPException(
             status_code=400,
-            detail="Area must be specified for area_congestion disruption type"
+            detail="Either disruption_nodes or disruption_area must be specified"
         )
     
-    # For node failures, specific nodes must be provided
-    if disruption_type == "node_failure" and not disruption_nodes:
+    try:
+        # Use real analysis service
+        impact = await analysis_service.simulate_disruption(
+            year=year,
+            disruption_type=disruption_type,
+            disruption_nodes=disruption_nodes,
+            disruption_area=disruption_area,
+            transport_modes=transport_modes
+        )
+        
+        return {
+            "disruption_simulation": {
+                "year": year,
+                "disruption_type": disruption_type,
+                "disruption_nodes": disruption_nodes,
+                "disruption_area": disruption_area,
+                "transport_modes": transport_modes,
+                "impact": {
+                    "affected_nodes": impact.affected_nodes,
+                    "affected_edges": impact.affected_edges,
+                    "connectivity_change": impact.connectivity_change,
+                    "estimated_delay_minutes": impact.estimated_delay,
+                    "detour_routes": impact.detour_routes
+                },
+                "simulation_timestamp": datetime.now().isoformat()
+            }
+        }
+        
+    except Exception as e:
         raise HTTPException(
-            status_code=400,
-            detail="At least one node ID must be specified for node_failure disruption type"
+            status_code=500,
+            detail=f"Failed to simulate disruption: {str(e)}"
         )
-    
-    # This is placeholder implementation
-    # In a real implementation, this would:
-    # 1. Load the appropriate graph for the requested year
-    # 2. Make modifications based on the disruption parameters
-    # 3. Recalculate network metrics and compare to baseline
-    
-    # Generate placeholder impact data
-    baseline_avg_travel_time = random.uniform(15, 25)  # minutes
-    disrupted_avg_travel_time = baseline_avg_travel_time * random.uniform(1.2, 2.5)
-    
-    baseline_accessibility = random.uniform(0.85, 0.99)
-    disrupted_accessibility = baseline_accessibility * random.uniform(0.6, 0.9)
-    
-    return {
-        "simulation_timestamp": datetime.now().isoformat(),
-        "year": year,
-        "disruption_type": disruption_type,
-        "disruption_nodes": disruption_nodes,
-        "disruption_area": disruption_area,
-        "impact_metrics": {
-            "travel_time": {
-                "baseline_avg": round(baseline_avg_travel_time, 1),
-                "disrupted_avg": round(disrupted_avg_travel_time, 1),
-                "percent_increase": round((disrupted_avg_travel_time / baseline_avg_travel_time - 1) * 100, 1)
-            },
-            "accessibility": {
-                "baseline": round(baseline_accessibility, 2),
-                "disrupted": round(disrupted_accessibility, 2),
-                "percent_decrease": round((1 - disrupted_accessibility / baseline_accessibility) * 100, 1)
-            },
-            "affected_routes": random.randint(5, 50),
-            "affected_population": random.randint(10000, 500000)
-        },
-        "rerouting_options": [{
-            "name": "Option 1",
-            "effectiveness": round(random.uniform(0.5, 0.9), 2),
-            "additional_travel_time": round(random.uniform(5, 20), 1)
-        }, {
-            "name": "Option 2",
-            "effectiveness": round(random.uniform(0.3, 0.8), 2),
-            "additional_travel_time": round(random.uniform(2, 15), 1)
-        }],
-        "status": "completed"
-    }
 
-
-@router.get("/analysis/forecasting")
+@router.get("/analysis/traffic-forecast")
 async def get_traffic_forecast(
     target_date: str = Query(..., description="Target date for forecast (YYYY-MM-DD)"),
     time_of_day: str = Query(..., description="Time of day (HH:MM)"),
@@ -189,50 +150,136 @@ async def get_traffic_forecast(
     """
     Get ML-based traffic flow and congestion forecasts for a future date and time.
     """
-    # This is placeholder implementation
-    # In a real implementation, this would:
-    # 1. Load the ML forecasting model
-    # 2. Prepare input features (date, time, historical patterns, etc.)
-    # 3. Generate and return forecasts
+    # Validate date format
+    try:
+        datetime.strptime(target_date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid date format. Use YYYY-MM-DD"
+        )
     
-    # Generate random congestion level (higher during peak hours)
-    hour = int(time_of_day.split(":")[0])
-    is_peak = (8 <= hour <= 10) or (17 <= hour <= 19)
+    # Validate time format
+    try:
+        datetime.strptime(time_of_day, "%H:%M")
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid time format. Use HH:MM"
+        )
     
-    if is_peak:
-        congestion_level = random.uniform(0.6, 0.9)
-    else:
-        congestion_level = random.uniform(0.2, 0.6)
+    try:
+        # Use real analysis service
+        forecast = await analysis_service.get_traffic_forecast(
+            target_date=target_date,
+            time_of_day=time_of_day,
+            area=area
+        )
+        
+        return {
+            "traffic_forecast": forecast
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate traffic forecast: {str(e)}"
+        )
+
+@router.get("/critical-nodes/{year}")
+async def get_critical_nodes(
+    year: int,
+    db: Session = Depends(get_db),
+    limit: int = Query(10, description="Number of critical nodes to return"),
+    algorithm: str = Query("betweenness", description="Algorithm type: betweenness, closeness, or degree")
+) -> Dict[str, Any]:
+    """
+    Get critical nodes in the transport network using graph analysis.
     
-    # Different forecast based on area
-    area_factor = 1.0
-    if area == "central":
-        area_factor = 1.2
-    elif area == "whitefield":
-        area_factor = 1.1
-    elif area == "electronic_city":
-        area_factor = 0.9
+    Args:
+        year: Year of the network data
+        limit: Maximum number of nodes to return
+        algorithm: Type of centrality analysis to use
     
-    congestion_level = min(0.95, congestion_level * area_factor)
+    Returns:
+        Critical nodes with centrality scores and coordinates
+    """
+    try:
+        logger.info(f"Calculating critical nodes for year {year} using {algorithm} centrality")
+        
+        # Get road network from database for graph construction
+        road_segments = db.query(RoadSegment).filter(RoadSegment.year == year).all()
+        
+        if not road_segments:
+            logger.warning(f"No road network data found for year {year}")
+            return {
+                "year": year,
+                "algorithm": algorithm,
+                "nodes": [],
+                "count": 0,
+                "message": f"No road network data available for year {year}"
+            }
+        
+        # Build graph from road segments
+        graph = graph_service.build_graph_from_segments(road_segments)
+        
+        if graph is None or graph.number_of_nodes() == 0:
+            logger.warning(f"Failed to build graph from road segments for year {year}")
+            return {
+                "year": year,
+                "algorithm": algorithm,
+                "nodes": [],
+                "count": 0,
+                "message": "Failed to build graph from road network data"
+            }
+        
+        # Calculate centrality measures
+        critical_nodes = []
+        
+        if algorithm == "betweenness":
+            centrality_scores = nx.betweenness_centrality(graph)
+        elif algorithm == "closeness":
+            centrality_scores = nx.closeness_centrality(graph)
+        elif algorithm == "degree":
+            centrality_scores = nx.degree_centrality(graph)
+        else:
+            # Default to betweenness if unknown algorithm
+            centrality_scores = nx.betweenness_centrality(graph)
+            algorithm = "betweenness"
+        
+        # Sort nodes by centrality score
+        sorted_nodes = sorted(
+            centrality_scores.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )[:limit]
+        
+        # Extract node information
+        for node_id, centrality_score in sorted_nodes:
+            node_data = graph.nodes.get(node_id, {})
+            
+            critical_nodes.append({
+                "id": str(node_id),
+                "centrality_score": round(centrality_score, 6),
+                "lat": node_data.get('y', 0),
+                "lon": node_data.get('x', 0),
+                "degree": graph.degree(node_id),
+                "betweenness": round(nx.betweenness_centrality(graph, k=min(100, graph.number_of_nodes())).get(node_id, 0), 6),
+                "closeness": round(nx.closeness_centrality(graph).get(node_id, 0), 6) if graph.number_of_nodes() < 1000 else 0
+            })
+        
+        return {
+            "year": year,
+            "algorithm": algorithm,
+            "nodes": critical_nodes,
+            "count": len(critical_nodes),
+            "total_nodes": graph.number_of_nodes(),
+            "total_edges": graph.number_of_edges()
+        }
     
-    # Generate sample forecast data
-    forecast = {
-        "timestamp": datetime.now().isoformat(),
-        "target_datetime": f"{target_date}T{time_of_day}:00",
-        "area": area or "bangalore",
-        "forecast_metrics": {
-            "congestion_level": round(congestion_level, 2),
-            "average_speed_kph": round(60 * (1 - congestion_level), 1),
-            "travel_time_multiplier": round(1 + congestion_level, 1)
-        },
-        "congestion_category": "High" if congestion_level > 0.7 else "Medium" if congestion_level > 0.4 else "Low",
-        "confidence_score": round(random.uniform(0.7, 0.95), 2),
-        "contributing_factors": [
-            {"factor": "Time of day", "importance": round(random.uniform(0.7, 0.9), 2)},
-            {"factor": "Day of week", "importance": round(random.uniform(0.5, 0.8), 2)},
-            {"factor": "Weather", "importance": round(random.uniform(0.3, 0.7), 2)},
-            {"factor": "Events", "importance": round(random.uniform(0.1, 0.6), 2)}
-        ]
-    }
-    
-    return forecast
+    except Exception as e:
+        logger.error(f"Error calculating critical nodes: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to calculate critical nodes: {str(e)}"
+        )

@@ -59,7 +59,10 @@ class Settings(BaseSettings):
     DATABASE_URL: str
 
     class Config:
-        env_file = ".env"
+        # Always load the .env that sits in the backend root, regardless of the
+        # current working directory.  This prevents missing-env errors when
+        # scripts are executed from sub-folders (e.g. backend/scripts).
+        env_file = str(ROOT_DIR / ".env")
         case_sensitive = True
 
 

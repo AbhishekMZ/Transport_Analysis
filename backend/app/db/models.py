@@ -1,8 +1,8 @@
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, JSON
 from sqlalchemy.orm import declarative_base, relationship
-from geoalchemy2 import Geometry
 import datetime
 
+# This is the standard base class for SQLAlchemy models.
 Base = declarative_base()
 
 class RoadSegment(Base):
@@ -13,7 +13,8 @@ class RoadSegment(Base):
     road_type = Column(String)
     lanes = Column(Integer)
     year = Column(Integer)
-    geometry = Column(Geometry('LINESTRING'))
+    # Storing geometry as a standard JSON type
+    geometry = Column(JSON)
 
 class BusStop(Base):
     __tablename__ = 'bus_stops'
@@ -24,7 +25,7 @@ class BusStop(Base):
     description = Column(String)
     zone_id = Column(String)
     year = Column(Integer)
-    geometry = Column(Geometry('POINT'))
+    geometry = Column(JSON)
 
 class BusRoute(Base):
     __tablename__ = 'bus_routes'
@@ -34,7 +35,7 @@ class BusRoute(Base):
     agency = Column(String)
     color = Column(String)
     year = Column(Integer)
-    geometry = Column(Geometry('LINESTRING'))
+    geometry = Column(JSON)
 
 class MetroStation(Base):
     __tablename__ = 'metro_stations'
@@ -43,7 +44,7 @@ class MetroStation(Base):
     name = Column(String)
     line_id = Column(String)
     year = Column(Integer)
-    geometry = Column(Geometry('POINT'))
+    geometry = Column(JSON)
 
 class MetroLine(Base):
     __tablename__ = 'metro_lines'
@@ -52,11 +53,11 @@ class MetroLine(Base):
     name = Column(String)
     color = Column(String)
     year = Column(Integer)
-    geometry = Column(Geometry('LINESTRING'))
+    geometry = Column(JSON)
 
 class TrafficSnapshot(Base):
     __tablename__ = 'traffic_snapshots'
     id = Column(Integer, primary_key=True)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     area = Column(String)
-    data = Column(JSON) 
+    data = Column(JSON)

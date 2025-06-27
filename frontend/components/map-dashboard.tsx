@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react"
 import { motion } from "framer-motion"
 import dynamic from 'next/dynamic'
-import ControlPanel from "@/components/control-panel"
+import CollapsibleControlPanel from "@/components/collapsible-control-panel"
 import FeatureInfoPanel from "@/components/feature-info-panel"
 import AnalysisToolsPanel from "@/components/analysis-tools-panel"
 import { AnimatedButton } from "@/components/ui/animated-button"
@@ -18,9 +18,14 @@ const LeafletMap = dynamic(() => import('@/components/leaflet-map'), {
 
 export default function MapDashboard() {
   const [selectedYear, setSelectedYear] = useState(2024)
-  const [activeLayers, setActiveLayers] = useState({
+  
+  type LayerKey = 'roads' | 'busStops' | 'busRoutes' | 'metroStations' | 'metroLines' | 'criticalNodes' | 'trafficFlow' | 'incidents' | 'forecast' | 'simulation'
+  
+  const [activeLayers, setActiveLayers] = useState<Record<LayerKey, boolean>>({
     roads: true,
     busStops: false,
+    busRoutes: false,
+    metroStations: false,
     metroLines: false,
     criticalNodes: false,
     trafficFlow: true,
@@ -30,13 +35,14 @@ export default function MapDashboard() {
   })
   const [selectedFeature, setSelectedFeature] = useState(null)
   const [toolsPanelOpen, setToolsPanelOpen] = useState(true)
+  const [controlPanelCollapsed, setControlPanelCollapsed] = useState(false)
   const [viewport, setViewport] = useState({
     latitude: 12.9716,
     longitude: 77.5946,
     zoom: 11,
   })
 
-  const handleLayerToggle = useCallback((layerName: string) => {
+  const handleLayerToggle = useCallback((layerName: LayerKey) => {
     setActiveLayers((prev) => ({
       ...prev,
       [layerName]: !prev[layerName],
@@ -47,24 +53,23 @@ export default function MapDashboard() {
     setSelectedFeature(feature)
   }, [])
 
+  const toggleControlPanel = () => {
+    setControlPanelCollapsed(!controlPanelCollapsed)
+  }
+
   return (
     <div className="flex-1 flex relative">
-      {/* Control Panel */}
-      <motion.div
-        initial={{ x: -300, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-        className="w-80 bg-white/95 dark:bg-navy-900/95 backdrop-blur-sm border-r border-navy-200 dark:border-navy-700 flex flex-col shadow-lg"
-      >
-        <ControlPanel
-          selectedYear={selectedYear}
-          onYearChange={setSelectedYear}
-          activeLayers={activeLayers}
-          onLayerToggle={handleLayerToggle}
-          viewport={viewport}
-          onViewportChange={setViewport}
-        />
-      </motion.div>
+      {/* Collapsible Control Panel */}
+      <CollapsibleControlPanel
+        selectedYear={selectedYear}
+        onYearChange={setSelectedYear}
+        activeLayers={activeLayers}
+        onLayerToggle={handleLayerToggle}
+        viewport={viewport}
+        onViewportChange={setViewport}
+        isCollapsed={controlPanelCollapsed}
+        onToggleCollapse={toggleControlPanel}
+      />
 
       {/* Map Container */}
       <div className="flex-1 relative">

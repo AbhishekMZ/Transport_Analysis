@@ -10,7 +10,8 @@ import asyncio
 import json
 
 from app.core.config import settings
-from app.api.routes import traffic, geojson, analysis, project
+from app.api.routes import traffic, geojson, analysis, project, reports, data_ingestion
+from app.api import ingestion
 from app.services.tomtom_service import tomtom_service
 from app.websockets import manager # <--- IMPORT FROM THE NEW FILE
 
@@ -58,10 +59,13 @@ app.add_middleware(
 )
 
 # Include API routers
-app.include_router(project.router, prefix=settings.API_V1_STR, tags=["project"])
-app.include_router(traffic.router, prefix=settings.API_V1_STR, tags=["traffic"])
-app.include_router(geojson.router, prefix=settings.API_V1_STR, tags=["geojson"])
-app.include_router(analysis.router, prefix=settings.API_V1_STR, tags=["analysis"])
+app.include_router(project.router, prefix="/api/v1", tags=["project"])
+app.include_router(traffic.router, prefix="/api/v1", tags=["traffic"])
+app.include_router(geojson.router, prefix="/api/v1", tags=["geojson"])
+app.include_router(analysis.router, prefix="/api/v1", tags=["analysis"])
+app.include_router(reports.router, prefix="/api/v1/reports", tags=["reports"])
+app.include_router(data_ingestion.router, prefix="/api/v1", tags=["data_ingestion"])
+app.include_router(ingestion.router, prefix="/api/v1", tags=["ingestion"])
 
 
 @app.websocket("/ws/traffic")

@@ -11,11 +11,15 @@ import { Slider } from "@/components/ui/slider"
 import { Zap, Play, TrendingUp, Cloud, Calendar } from "lucide-react"
 import DashboardLayout from "@/components/dashboard-layout"
 import MapComponent from "@/components/map-component"
+import { AnalysisAPI } from "@/lib/api"
 
 interface ForecastResult {
   timestamp: string
   value: number
   confidence: number
+  location?: string
+  congestionLevel?: number
+  predictedSpeed?: number
 }
 
 export default function MLForecastingPage() {
@@ -39,6 +43,7 @@ export default function MLForecastingPage() {
     dayOfWeek: "weekday",
     season: "current",
   })
+  const [error, setError] = useState<string | null>(null)
 
   const forecastTypes = [
     { value: "traffic_flow", label: "Traffic Flow" },
@@ -56,21 +61,85 @@ export default function MLForecastingPage() {
 
   const runForecast = async () => {
     setIsForecasting(true)
+    setError(null)
+    
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 3000))
+      // Get current date/time and calculate target time based on period
+      const now = new Date()
+      let targetDate: string
+      let targetTime: string
+      
+      // Calculate target date/time based on forecast type
+      if (forecastParams.timePeriod === "morning rush") {
+        const tomorrow = new Date(now)
+        tomorrow.setDate(tomorrow.getDate() + 1)
+        targetDate = tomorrow.toISOString().split('T')[0]
+        targetTime = "08:00"
+      } else if (forecastParams.timePeriod === "evening rush") {
+        targetDate = now.toISOString().split('T')[0]
+        targetTime = "18:00"
+      } else if (forecastParams.timePeriod === "1 day") {
+        const tomorrow = new Date(now)
+        tomorrow.setDate(tomorrow.getDate() + 1)
+        targetDate = tomorrow.toISOString().split('T')[0]
+        targetTime = now.getHours().toString().padStart(2, '0') + ":00"
+      } else {
+        // Default to next day at current time
+        const nextDay = new Date(now)
+        nextDay.setDate(nextDay.getDate() + 1)
+        targetDate = nextDay.toISOString().split('T')[0]
+        targetTime = now.getHours().toString().padStart(2, '0') + ":00"
+      }
 
-      // Generate mock forecast results
-      const hours = forecastParams.timePeriod.includes("week") ? 168 : 24
-      const mockResults: ForecastResult[] = Array.from({ length: hours }, (_, i) => ({
-        timestamp: new Date(Date.now() + i * 3600000).toISOString(),
-        value: Math.sin(i * 0.1) * 50 + 50 + Math.random() * 20,
-        confidence: 0.7 + Math.random() * 0.3,
-      }))
+      // Call the real analysis API
+      const forecastData = await AnalysisAPI.getTrafficForecast({
+        datetime: `${targetDate} ${targetTime}`,
+        area: forecastParams.areaOfInterest || undefined
+      })
 
-      setForecastResults(mockResults)
+      // Convert API response to ForecastResult format
+      const results: ForecastResult[] = []
+      
+      if (forecastData.forecast_data && forecastData.forecast_data.area_forecasts) {
+        Object.entries(forecastData.forecast_data.area_forecasts).forEach(([areaName, forecast]: [string, any]) => {
+          // Generate time series data based on forecast
+          const hours = forecastParams.timePeriod.includes("week") ? 168 : 
+                       forecastParams.timePeriod.includes("month") ? 720 : 24
+          
+          for (let i = 0; i < hours; i++) {
+            const forecastTime = new Date(now.getTime() + i * 3600000)
+            results.push({
+              timestamp: forecastTime.toISOString(),
+              value: forecast.average_speed || 0,
+              confidence: forecast.confidence || 0.8,
+              location: areaName,
+              congestionLevel: forecast.congestion_level || 0,
+              predictedSpeed: forecast.average_speed || 0
+            })
+          }
+        })
+      } else {
+        // Fallback: generate single forecast result
+        const hours = forecastParams.timePeriod.includes("week") ? 168 : 
+                     forecastParams.timePeriod.includes("month") ? 720 : 24
+        
+        for (let i = 0; i < hours; i++) {
+          const forecastTime = new Date(now.getTime() + i * 3600000)
+          results.push({
+            timestamp: forecastTime.toISOString(),
+            value: forecastData.forecast_data?.overall_congestion ? 
+                   (1 - forecastData.forecast_data.overall_congestion) * 100 : 50,
+            confidence: forecastData.confidence || 0.8,
+            location: forecastParams.areaOfInterest || "Bangalore"
+          })
+        }
+      }
+
+      setForecastResults(results)
+      
     } catch (error) {
       console.error("Forecast failed:", error)
+      setError(`Failed to generate forecast: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setIsForecasting(false)
     }

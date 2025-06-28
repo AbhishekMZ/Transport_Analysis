@@ -1,4 +1,8 @@
 import streamlit as st
+# Set CPU count for joblib to prevent warnings
+import os
+os.environ['LOKY_MAX_CPU_COUNT'] = str(os.cpu_count() or 4)  # Fallback to 4 if detection fails
+
 import pandas as pd
 import numpy as np
 import plotly.express as px

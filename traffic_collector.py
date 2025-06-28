@@ -2,13 +2,33 @@ import os
 import time as time_module  # Renamed to avoid conflict
 import sqlite3
 import pandas as pd
-from datetime import datetime
-from typing import List, Dict, Any
+from datetime import datetime, timezone
+from typing import List, Dict, Any, Optional
 import requests
 from dotenv import load_dotenv
+import logging
+import argparse
+import sys
 from traffic_config import MONITOR_POINTS, COLLECTION_INTERVAL, API_TIMEOUT, MAX_RETRIES
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger('traffic_collector')
+
+# Load environment variables
 load_dotenv()
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Traffic Data Collector')
+    parser.add_argument('--debug', action='store_true', help='Enable debug logging')
+    parser.add_argument('--once', action='store_true', help='Run collection once and exit')
+    return parser.parse_args()
 
 class TrafficDataCollector:
     def __init__(self, db_path: str = "traffic_data.db"):
@@ -17,10 +37,10 @@ class TrafficDataCollector:
         self._init_db()
         self._verify_api_key()
         
-    def _verify_api_key(self):
+    def _verify_api_key(self) -> bool:
         """Verify that the API key is valid"""
         if not self.api_key:
-            print("❌ TOMTOM_API_KEY is not set in .env file")
+            logger.error("TOMTOM_API_KEY is not set in .env file")
             return False
             
         test_url = "https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json"
@@ -32,16 +52,17 @@ class TrafficDataCollector:
         }
         
         try:
+            logger.debug(f"Testing API key with URL: {test_url}")
             response = requests.get(test_url, params=params, timeout=10)
             if response.status_code == 200:
-                print("✅ API key is valid and working")
+                logger.info("API key is valid and working")
                 return True
             elif response.status_code == 403:
-                print("❌ Invalid API key. Please check your TOMTOM_API_KEY")
+                logger.error("Invalid API key. Please check your TOMTOM_API_KEY")
             else:
-                print(f"❌ API error (HTTP {response.status_code}): {response.text[:200]}")
+                logger.error(f"API error (HTTP {response.status_code}): {response.text[:200]}")
         except Exception as e:
-            print(f"❌ Failed to connect to TomTom API: {str(e)}")
+            logger.exception(f"Failed to connect to TomTom API: {str(e)}")
         
         return False
         
@@ -187,35 +208,85 @@ class TrafficDataCollector:
             ))
             conn.commit()
     
-    def collect_data(self):
-        """Collect traffic data for all points"""
-        start_time = datetime.now()
-        print(f"\n🔄 Starting data collection at {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    def collect_data(self, run_once: bool = False):
+        """
+        Main method to collect traffic data for all monitor points
         
-        successful_points = 0
-        total_points = len(MONITOR_POINTS)
+        Args:
+            run_once: If True, run collection once and exit
+        """
+        logger.info(f"Starting traffic data collection (interval: {COLLECTION_INTERVAL}s)")
+        logger.info(f"Monitoring {len(MONITOR_POINTS)} locations")
         
-        for point in MONITOR_POINTS:
-            try:
-                print(f"\n📍 Processing {point.name}...")
-                traffic_data = self.get_traffic_data(point)
-                if traffic_data:
-                    self.save_traffic_data(traffic_data)
-                    print(f"✅ Saved data for {point.name}")
-                    successful_points += 1
-                else:
-                    print(f"⚠️  No data received for {point.name}")
+        try:
+            while True:
+                start_time = time_module.time()
+                timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+                logger.info(f"Starting data collection cycle at {timestamp}")
                 
-                # Small delay between API calls
-                time_module.sleep(1)
+                success_count = 0
+                for i, point in enumerate(MONITOR_POINTS, 1):
+                    try:
+                        # Handle both dictionary and object access patterns
+                        point_name = point.get('name', 'Unnamed') if hasattr(point, 'get') else getattr(point, 'name', 'Unnamed')
+                        logger.debug(f"Processing point {i}/{len(MONITOR_POINTS)}: {point_name}")
+                        if self._collect_point_data(point):
+                            success_count += 1
+                    except Exception as e:
+                        point_name = point.get('name', 'Unnamed') if hasattr(point, 'get') else getattr(point, 'name', 'Unnamed')
+                        logger.error(f"Error processing {point_name}: {str(e)}", exc_info=True)
                 
-            except Exception as e:
-                print(f"❌ Error processing {point.name}: {str(e)}")
-        
-        end_time = datetime.now()
-        duration = (end_time - start_time).total_seconds()
-        
-        print(f"\n📊 Collection Complete!")
-        print(f"   • Successful points: {successful_points}/{total_points}")
-        print(f"   • Duration: {duration:.2f} seconds")
-        print(f"   • Completed at: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                elapsed = time_module.time() - start_time
+                logger.info(f"Completed cycle: {success_count}/{len(MONITOR_POINTS)} points collected in {elapsed:.1f}s")
+                
+                if run_once:
+                    logger.info("Run once mode: Exiting after one collection cycle")
+                    break
+                
+                # Calculate sleep time, ensuring we don't go negative
+                sleep_time = max(0, COLLECTION_INTERVAL - elapsed)
+                if sleep_time > 0:
+                    logger.debug(f"Sleeping for {sleep_time:.1f} seconds")
+                    time_module.sleep(sleep_time)
+                
+        except KeyboardInterrupt:
+            logger.info("Data collection stopped by user")
+        except Exception as e:
+            logger.exception("Fatal error in collection loop")
+            raise
+
+    def _collect_point_data(self, point):
+        """Collect traffic data for a single point"""
+        try:
+            # Handle both dictionary and object access patterns
+            point_name = point.get('name', 'Unnamed') if hasattr(point, 'get') else getattr(point, 'name', 'Unnamed')
+            logger.debug(f"Collecting data for point: {point_name}")
+            
+            data = self.get_traffic_data(point)
+            if data:
+                self.save_traffic_data(data)
+                return True
+            return False
+        except Exception as e:
+            point_name = point.get('name', 'Unnamed') if hasattr(point, 'get') else getattr(point, 'name', 'Unnamed')
+            logger.error(f"Error in _collect_point_data for {point_name}: {str(e)}", exc_info=True)
+            return False
+
+if __name__ == "__main__":
+    args = parse_args()
+    
+    # Set debug logging if requested
+    if args.debug:
+        logger.setLevel(logging.DEBUG)
+        logger.debug("Debug logging enabled")
+    
+    try:
+        collector = TrafficDataCollector()
+        logger.info("Starting traffic data collection...")
+        collector.collect_data(run_once=args.once)
+        logger.info("Traffic data collection finished")
+    except KeyboardInterrupt:
+        logger.info("Traffic collection stopped by user")
+    except Exception as e:
+        logger.critical(f"Fatal error: {str(e)}", exc_info=True)
+        sys.exit(1)

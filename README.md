@@ -34,9 +34,10 @@ A comprehensive real-time traffic monitoring and analysis system for Bengaluru, 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Python 3.8+
+- Python 3.8+ (Recommend using the official Python installer, not Microsoft Store version)
 - pip (Python package manager)
-- SQLite3
+- SQLite3 (usually comes with Python)
+- Git (for cloning the repository)
 
 ### Installation
 
@@ -46,8 +47,87 @@ A comprehensive real-time traffic monitoring and analysis system for Bengaluru, 
    cd bengaluru-traffic-analysis
    ```
 
-2. **Set up a virtual environment** (recommended)
+2. **Set up and activate a virtual environment** (highly recommended)
    ```bash
+   # Windows
+   python -m venv venv
+   .\venv\Scripts\activate
+   
+   # macOS/Linux
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+
+3. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+   
+   If you encounter any issues with specific packages, try installing them manually:
+   ```bash
+   pip install streamlit pandas numpy plotly folium streamlit-folium python-dotenv
+   ```
+
+### Running the Application
+
+1. **Start the Traffic Data Collector** (in a separate terminal)
+   ```bash
+   # In the project directory
+   python traffic_collector.py
+   ```
+   
+   The collector will start gathering traffic data and storing it in the SQLite database.
+
+2. **Launch the Dashboard** (in a new terminal)
+   ```bash
+   # Make sure you're in the virtual environment
+   streamlit run traffic_dashboard_main.py
+   ```
+   
+   The dashboard should automatically open in your default web browser. If it doesn't, navigate to:
+   ```
+   http://localhost:8501
+   ```
+
+### Troubleshooting
+
+1. **If you see CPU core detection warnings**:
+   - The warning about `LOKY_MAX_CPU_COUNT` is harmless but can be fixed by setting the environment variable:
+   ```bash
+   # On Windows
+   set LOKY_MAX_CPU_COUNT=4
+   
+   # On macOS/Linux
+   export LOKY_MAX_CPU_COUNT=4
+   ```
+   Or add it to your environment variables permanently.
+
+2. **If the dashboard looks different or has rendering issues**:
+   - Clear your browser cache
+   - Make sure you're using a modern browser (Chrome, Firefox, Edge, or Safari)
+   - Check the terminal for any error messages
+
+3. **If you encounter dependency conflicts**:
+   ```bash
+   # Try upgrading pip first
+   pip install --upgrade pip
+   
+   # Then reinstall the requirements
+   pip install -r requirements.txt --force-reinstall
+   ```
+
+### Common Issues
+
+- **Streamlit not found**: Make sure you've activated your virtual environment
+- **Port 8501 in use**: Use `streamlit run traffic_dashboard_main.py --server.port 8502` to use a different port
+- **Database issues**: Ensure the SQLite database file has write permissions
+
+### Stopping the Application
+- Press `Ctrl+C` in both terminal windows to stop the dashboard and collector
+- Deactivate the virtual environment when done:
+  ```bash
+  deactivate
+  ```
    # On Windows
    python -m venv venv
    .\venv\Scripts\activate
